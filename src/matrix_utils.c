@@ -16,6 +16,11 @@ struct Matrix createMatrix(int rows, int colms)
     return matrix;
 }
 
+struct Matrix createMatrixForMul(struct Matrix* a, struct Matrix* b)
+{
+    return createMatrix(a->rows, b->colms);
+}
+
 void freeMatrix(struct Matrix* matrix)
 {
     free(matrix->matrix);
@@ -66,8 +71,69 @@ int addMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b)
     return 0;
 }
 
+int canMatrixMul(struct Matrix* a, struct Matrix* b)
+{
+    return a->colms == b->rows;
+}
+
 int mulMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b)
 {
+if (!canMatrixMul(a, b))
+    {
+        return -1;
+    }
+
+    if ( (c->rows != a->rows) || (c->colms != b->colms) )
+    {
+        return -2;
+    }
+
+    for (int row = 0; row < c->rows; row++)
+    {
+        for (int colm = 0; colm < c->colms; colm++)
+        {
+            unsigned long summ = 0;
+
+            for (int r = 0; r < a->colms; r++)
+            {
+                summ += getMatrixAt(a, row, r) * getMatrixAt(b, r, colm);
+            }
+            
+            setMatrixAt(c, row, colm, summ);
+        }
+    }
+
+    return 0;
+}
+
+/// @brief Multiply two matrix and summ each result matrix element to exiting result matrix
+/// @param c 
+/// @param a 
+/// @param b 
+/// @return 0 - success; -1 - matrix cant be multiply; -2 - c cant be result matrix 
+int mulAndAddMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b)
+{
+    if (!canMatrixMul(a, b))
+    {
+        return -1;
+    }
+
+    if ( (c->rows != a->rows) || (c->colms != b->colms) )
+    {
+        return -2;
+    }
+
+    for (int row = 0; row < c->rows; row++)
+    {
+        for (int colm = 0; colm < c->colms; colm++)
+        {
+            for (int r = 0; r < a->colms; r++)
+            {
+                setMatrixAt(c, row, colm, getMatrixAt(c, row, colm) + getMatrixAt(a, row, r) * getMatrixAt(b, r, colm));
+            }
+        }
+    }
+
     return 0;
 }
 
