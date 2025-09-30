@@ -16,29 +16,30 @@ struct Matrix createMatrix(int rows, int colms)
     return matrix;
 }
 
-struct Matrix createMatrixForMul(struct Matrix* a, struct Matrix* b)
+inline struct Matrix createMatrixForMul(struct Matrix* a, struct Matrix* b)
 {
     return createMatrix(a->rows, b->colms);
 }
 
-void freeMatrix(struct Matrix* matrix)
+
+inline void freeMatrix(struct Matrix* matrix)
 {
     free(matrix->matrix);
 }
 
-void setMatrixAt(struct Matrix* matrix, int row, int colm, int value)
+inline void setMatrixAt(struct Matrix* matrix, int row, int colm, int value)
 {
     matrix->matrix[row * matrix->colms + colm] = value;
     //*(matrix->matrix + row*colm + colm) = value;
 }
 
-int getMatrixAt(struct Matrix* matrix, int row, int colm)
+inline int getMatrixAt(struct Matrix* matrix, int row, int colm)
 {
     return matrix->matrix[row * matrix->colms + colm];
     //return *(matrix->matrix + row*colm + colm);
 }
 
-int canMatrixAdd(struct Matrix* a, struct Matrix* b)
+inline int canMatrixAdd(struct Matrix* a, struct Matrix* b)
 {
     return (a->rows == b->rows) && (a->colms == b->colms);
 }
@@ -71,7 +72,7 @@ int addMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b)
     return 0;
 }
 
-int canMatrixMul(struct Matrix* a, struct Matrix* b)
+inline int canMatrixMul(struct Matrix* a, struct Matrix* b)
 {
     return a->colms == b->rows;
 }

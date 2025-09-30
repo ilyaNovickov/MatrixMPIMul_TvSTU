@@ -78,5 +78,7 @@ int main(int argc, char* argv[]) {
     freeMatrix(&mat2);
     freeMatrix(&res);
 
+    int s[] = {2,2,300}; 
+
     return 0;
 }
