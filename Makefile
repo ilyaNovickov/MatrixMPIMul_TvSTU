@@ -5,6 +5,7 @@ BIN_DIR = bin
 SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJ = $(SRC:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 DEPS = $(OBJ:.o=.d)
+LIBS = -lgmp
 
 # ==== Сборка RELEASE ====
 CFLAGS = -Wall -O2 -std=c11
@@ -13,7 +14,7 @@ TARGET = $(BIN_DIR)/matrix_mpi
 all: $(TARGET)
 
 $(TARGET): $(OBJ) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 # ==== Сборка DEBUG ====
 DEBUG_TARGET = $(BIN_DIR)/matrix_mpi_debug
@@ -23,7 +24,7 @@ debug: CFLAGS := $(DEBUG_FLAGS)
 debug: $(DEBUG_TARGET)
 
 $(DEBUG_TARGET): $(OBJ) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 # ==== Общие правила ====
 $(BIN_DIR):
