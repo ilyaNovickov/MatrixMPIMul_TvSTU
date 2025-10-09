@@ -29,6 +29,8 @@ int mulMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b);
 
 int mulAndAddMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b);
 
+void fillMatrixRandom(Matrix* matrix, int minValue, int maxValue); // int [min, max]
+
 #endif 
 
 

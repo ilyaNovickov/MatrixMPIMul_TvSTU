@@ -1,9 +1,46 @@
 #include <stdio.h>
+#include <time.h>
 
-//#include "matrix_utils.h"
-#include "gmp_matrix_utils.h"
+#include "matrix_utils.h"
+#include "matrix_utils_f.h"
+//#include "gmp_matrix_utils.h"
 
+int main(int argc, char** argv)
+{
+    srand((unsigned) time(NULL)); // Инициализация random seed
 
+    Matrix mat = createMatrix(3, 3);
+    fillMatrixRandom(&mat, -100, 100); // Заполнение от -100 до 100
+
+    for (int row = 0; row < mat.rows; row++)
+    {
+        for (int col = 0; col < mat.colms; col++)
+        {
+            printf("%i |", getMatrixAt(&mat, row, col));
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+    MatrixF fmat = createMatrixF(3, 3);
+    fillMatrixFRandom(&fmat); // Заполнение значениями от -1 до +1
+
+    for (int row = 0; row < fmat.rows; row++)
+    {
+        for (int col = 0; col < fmat.colms; col++)
+        {
+            printf("%f |", getMatrixFAt(&fmat, row, col));
+        }
+        printf("\n");
+    }
+    printf("\n");
+
+    freeMatrix(&mat);
+    freeMatrixF(&fmat);
+}
+
+/*
+//Тестирование gmp
 int main(int argc, char* argv[]) {
 
     int n = 3;
@@ -105,6 +142,7 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+*/
 
 /*
 //test usual matrixes

@@ -1,6 +1,6 @@
 #include "matrix_utils.h"
 #include <stdlib.h>
-
+#include <time.h>
 
 
 struct Matrix createMatrix(int rows, int colms)
@@ -136,6 +136,16 @@ int mulAndAddMatrix(struct Matrix* c, struct Matrix* a, struct Matrix* b)
     }
 
     return 0;
+}
+
+void fillMatrixRandom(Matrix* matrix, int minValue, int maxValue) {
+    int range = maxValue - minValue + 1;
+    for (int i = 0; i < matrix->rows; ++i) {
+        for (int j = 0; j < matrix->colms; ++j) {
+            int val = rand() % range + minValue; // [minValue, maxValue]
+            setMatrixAt(matrix, i, j, val);
+        }
+    }
 }
 
 
