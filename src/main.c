@@ -1,229 +1,253 @@
 #include <stdio.h>
-#include <time.h>
+#include <stdlib.h>
+#include <math.h>
+//#include <time.h>
 
-#include "matrix_utils.h"
+#include <mpi.h>
+
 #include "matrix_utils_f.h"
-//#include "gmp_matrix_utils.h"
+
+void getCPUCoords(int* resRow, int* resCol, MPI_Comm* cart_comm, int rank)
+{
+    int coords[2];
+    MPI_Cart_coords(*cart_comm, rank, 2, coords);
+    *resRow = coords[0];
+    *resCol = coords[1];
+}
+
+void printMatrixF(MatrixF* matrix)
+{
+    for (int row = 0; row < matrix->rows; row++)
+    {
+        for (int col = 0; col < matrix->colms; col++)
+        {
+            printf("%f |", getMatrixFAt(matrix, row, col));
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+void InitSqMatrixes(MatrixF* a, MatrixF* b, int matrixSize)
+{
+    *a = createMatrixF(matrixSize, matrixSize);
+    *b = createMatrixF(matrixSize, matrixSize);
+    //fillMatrixFRandom(&A);
+    //fillMatrixFRandom(&B);
+    for (int i = 0; i < matrixSize*matrixSize; i++)
+    {
+        a->data[i] = i + 1;
+        b->data[i] = i + 1;
+    }
+    printf("=== Matrix A ===\n");
+    printMatrixF(a);
+    printf("================\n");
+    printf("=== Matrix B ===\n");
+    printMatrixF(b);
+    printf("================\n");
+}
 
 int main(int argc, char** argv)
 {
-    srand((unsigned) time(NULL)); // Инициализация random seed
+    int rank;
 
-    Matrix mat = createMatrix(3, 3);
-    fillMatrixRandom(&mat, -100, 100); // Заполнение от -100 до 100
+    int size;
 
-    for (int row = 0; row < mat.rows; row++)
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    double start = MPI_Wtime();//timer 1
+
+    //step 1: init CPU matrix P
+
+    //size of CPU matrix (q x q)
+    int q = (int)sqrt(size);
+    //checking q
+    if (q * q != size)
     {
-        for (int col = 0; col < mat.colms; col++)
-        {
-            printf("%i |", getMatrixAt(&mat, row, col));
-        }
-        printf("\n");
+        if (rank == 0)
+            printf("Count of CPUs have to be q^2");
+        MPI_Finalize();
+        return -1;
     }
-    printf("\n");
 
-    MatrixF fmat = createMatrixF(3, 3);
-    fillMatrixFRandom(&fmat); // Заполнение значениями от -1 до +1
+    //create topology for CPU matrix
+    int dims[2] = {q, q};//CPU matrix
+    int periods[2] = {1, 1}; //borders for B moving
+    //switcher where P matrix will be
+    MPI_Comm cart_comm;
+    MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &cart_comm);
 
-    for (int row = 0; row < fmat.rows; row++)
+    /*
+    //find coords for CPU (rank) in P (CPU matrix)
+    int coords[2];
+    MPI_Cart_coords(cart_comm, rank, 2, coords);
+    int row = coords[0];
+    int col = coords[1];
+    */
+
+    //generate matrix A and B
+    MatrixF A, B;
+    int N = 6;//size of matrix (N x N)
+
+    if (rank == 0)
     {
-        for (int col = 0; col < fmat.colms; col++)
-        {
-            printf("%f |", getMatrixFAt(&fmat, row, col));
-        }
-        printf("\n");
+        InitSqMatrixes(&A, &B, N);
     }
-    printf("\n");
 
-    freeMatrix(&mat);
-    freeMatrixF(&fmat);
-}
+    //size of one block in each CPU
+    int block_size = N / q;
 
-/*
-//Тестирование gmp
-int main(int argc, char* argv[]) {
-
-    int n = 3;
-    int m = 3;
-
-    struct mpz_Matrix mat1 = mpz_createMatrix(n+1, m);
-    struct mpz_Matrix mat2 = mpz_createMatrix(n, m+1);
+    MatrixF localA = createMatrixF(block_size, block_size);
+    MatrixF localB = createMatrixF(block_size, block_size);
+    MatrixF localC = createMatrixF(block_size, block_size);
     
-    int c = 1;
+    if (rank == 0)
+    {
+        for (int proc = 0; proc < size; proc++)
+        {
+            int row;
+            int col;
+            getCPUCoords(&row, &col, &cart_comm, proc);
 
-    for (int rows = 0; rows < mat1.rows; rows++)
-    {
-        for (int colms = 0; colms < mat1.colms; colms ++)
-        {
-            mpz_t tmp;
-            mpz_init_set_si(tmp, 2);
-            mpz_setMatrixAt(&mat1, rows, colms, tmp);
-            mpz_clear(tmp);
-        }
-    }
-    c = 1;
-    for (int rows = 0; rows < mat2.rows; rows++)
-    {
-        for (int colms = 0; colms < mat2.colms; colms ++)
-        {
-            mpz_t tmp;
-            mpz_init_set_si(tmp, 2);
-            mpz_setMatrixAt(&mat2, rows, colms, tmp);
-            mpz_clear(tmp);
-        }
-    }
-    
-    for (int rows = 0; rows < mat1.rows; rows++)
-    {
-        for (int colms = 0; colms < mat1.colms; colms ++)
-        {
-            mpz_t temp;
-            mpz_init(temp);
-            mpz_getMatrixAt(&mat1, rows, colms, temp);
-            gmp_printf("%Zd | ", temp);
-            mpz_clear(temp);
-        }
-        gmp_printf("\n");
-    }
-    gmp_printf("+++++++++++++++++++++++++++++++++++++\n");
-    
-    for (int rows = 0; rows < mat2.rows; rows++)
-    {
-        for (int colms = 0; colms < mat2.colms; colms ++)
-        {
-            mpz_t temp;
-            mpz_init(temp);
-            mpz_getMatrixAt(&mat2, rows, colms, temp);
-            gmp_printf("%Zd | ", temp);
-            mpz_clear(temp);
-        }
-        printf("\n");
-    }
-    printf("\n");
-    c = 1;
-    //struct Matrix res = createMatrix(n, m);
-    struct mpz_Matrix res = mpz_createMatrixForMul(&mat1, &mat2);
-    
-    for (int rows = 0; rows < n; rows++)
-    {
-        for (int colms = 0; colms < m; colms ++)
-        {
-            mpz_t tmpSet;
-            mpz_init_set_si(tmpSet, 2);
-            mpz_setMatrixAt(&res, rows, colms, tmpSet);
-            mpz_clear(tmpSet);
+            //take block
+            MatrixF tempA = createMatrixF(block_size, block_size);
+            MatrixF tempB = createMatrixF(block_size, block_size);
+        
+            for (int i = 0; i < block_size; i++)
+            {
+                for (int j = 0; j < block_size; j++)
+                {
+                    float valA = getMatrixFAt(&A, row*block_size+i, col*block_size+j);
+                    float valB = getMatrixFAt(&B, row*block_size+i, col*block_size+j);
 
-            mpz_t temp;
-            mpz_init(temp);
-            mpz_getMatrixAt(&res, rows, colms, temp);
-            gmp_printf("%Zd | ", temp);
-            mpz_clear(temp);
+                    setMatrixFAt(&tempA, i, j, valA);
+                    setMatrixFAt(&tempB, i, j, valB);
+                }
+            }
+
+            if (proc == 0)
+            {
+                localA = tempA;
+                localB = tempB;
+            }
+            else
+            {
+                MPI_Send(tempA.data, block_size * block_size, MPI_FLOAT, proc, 0, cart_comm);
+                MPI_Send(tempB.data, block_size * block_size, MPI_FLOAT, proc, 1, cart_comm);
+                freeMatrixF(&tempA);
+                freeMatrixF(&tempB);
+            }
         }
-        gmp_printf("\n");
     }
-    gmp_printf("\n");
-    int result = mpz_mulMatrix(&res, &mat1, &mat2);
-    for (int rows = 0; rows < res.rows; rows++)
+    else
     {
-        for (int colms = 0; colms < res.colms; colms ++)
-        {
-            mpz_t temp;
-            mpz_init(temp);
-            mpz_getMatrixAt(&res, rows, colms, temp);
-            gmp_printf("%Zd | ", temp);
-            mpz_clear(temp);
-        }
-        gmp_printf("\n");
+        MPI_Recv(localA.data, block_size*block_size, MPI_FLOAT, 0, 0, cart_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(localB.data, block_size * block_size, MPI_FLOAT, 0, 1, cart_comm, MPI_STATUS_IGNORE);
     }
 
-    mpz_freeMatrix(&mat1);
-    mpz_freeMatrix(&mat2);
-    mpz_freeMatrix(&res);
+    int row;
+    int col;
+    getCPUCoords(&row, &col, &cart_comm, 0);
+
+    //Fox's do
+    MatrixF tempA = createMatrixF(block_size, block_size);
+
+    for (int stage = 0; stage < q; stage++)
+    {
+        int root = (row + stage) % q;//which A matrix send
+
+        if (col == root)
+        {
+            for (int i = 0; i < block_size * block_size; i++)
+            {
+                tempA.data[i] = localA.data[i];
+
+            }
+        }
+        //send A for row
+        MPI_Bcast(tempA.data, block_size*block_size, MPI_FLOAT, root, cart_comm);
+
+        mulAndAddMatrixF(&localC, &tempA, &localB);
+
+        //shift for colums of B matrix
+        int src, dst;
+        MPI_Cart_shift(cart_comm, 0, -1, &src, &dst);
+        MPI_Sendrecv_replace(localB.data, block_size*block_size, MPI_FLOAT, dst, 0, src, 0, cart_comm, MPI_STATUS_IGNORE);
+    }
+
+    freeMatrixF(&tempA);
+
+    //get result to rank == 0 CPU
+    MatrixF C;
+
+    if (rank == 0)
+    {
+        C = createMatrixF(N, N);
+
+        for (int proc = 0; proc < size; proc++)
+        {
+            int row;
+            int col;
+            getCPUCoords(&row, &col, &cart_comm, proc);
+
+            if (proc == 0)
+            {
+                for (int i = 0; i < block_size; i++)
+                {
+                    for (int j = 0; j < block_size; j++)
+                    {
+                        float val = getMatrixFAt(&localC, i, j);
+                        setMatrixFAt(&C, row*block_size + i, col*block_size + j, val);
+                    }
+                }
+            }
+            else
+            {
+                MatrixF tempC = createMatrixF(block_size, block_size);
+
+                MPI_Recv(tempC.data, block_size*block_size, MPI_FLOAT, proc, 2, cart_comm, MPI_STATUS_IGNORE);
+
+                for (int i = 0; i < block_size; i++)
+                {
+                    for (int j = 0; j < block_size; j++)
+                    {
+                        float val = getMatrixFAt(&tempC, i, j);
+                    setMatrixFAt(&C, row*block_size + i, col*block_size + j, val);
+                    }
+                }
+
+                freeMatrixF(&tempC);
+            }
+        }
+    }
+    else
+    {
+        MPI_Send(localC.data, block_size*block_size, MPI_FLOAT, 0, 2, cart_comm);
+    }
+
+
+    //end
+    double end = MPI_Wtime();//timer 2
+
+    if (rank == 0)
+    {
+        printf("Time %f seconds for rank = %i\n", end - start, rank);
+    }
+
+    //trash bin
+    printf("=========\n");
+    printMatrixF(&C);
+    
+    MPI_Finalize();
+    freeMatrixF(&A);
+    freeMatrixF(&B);
+    freeMatrixF(&C);
+    freeMatrixF(&localA);
+    freeMatrixF(&localB);
+    freeMatrixF(&localC);
+    freeMatrixF(&tempA);
 
     return 0;
 }
-*/
-
-/*
-//test usual matrixes
-int main(int argc, char* argv[]) {
-
-    int n = 3;
-    int m = 3;
-
-    struct Matrix mat1 = createMatrix(n+1, m);
-    struct Matrix mat2 = createMatrix(n, m+1);
-    
-    int c = 1;
-
-    for (int rows = 0; rows < mat1.rows; rows++)
-    {
-        for (int colms = 0; colms < mat1.colms; colms ++)
-        {
-            //setMatrixAt(&mat, rows, colms, c++);
-            setMatrixAt(&mat1, rows, colms, c++);
-        }
-    }
-    c = 1;
-    for (int rows = 0; rows < mat2.rows; rows++)
-    {
-        for (int colms = 0; colms < mat2.colms; colms ++)
-        {
-            //setMatrixAt(&mat, rows, colms, c++);
-            setMatrixAt(&mat2, rows, colms, c++);
-        }
-    }
-    
-    for (int rows = 0; rows < mat1.rows; rows++)
-    {
-        for (int colms = 0; colms < mat1.colms; colms ++)
-        {
-            printf("%i | ", getMatrixAt(&mat1, rows, colms));
-        }
-        printf("\n");
-    }
-    printf("+++++++++++++++++++++++++++++++++++++\n");
-    
-    for (int rows = 0; rows < mat2.rows; rows++)
-    {
-        for (int colms = 0; colms < mat2.colms; colms ++)
-        {
-            
-            printf("%i | ", getMatrixAt(&mat2, rows, colms));
-        }
-        printf("\n");
-    }
-    printf("\n");
-    c = 1;
-    //struct Matrix res = createMatrix(n, m);
-    struct Matrix res = createMatrixForMul(&mat1, &mat2);
-    
-    for (int rows = 0; rows < n; rows++)
-    {
-        for (int colms = 0; colms < m; colms ++)
-        {
-            setMatrixAt(&res, rows, colms, c++);
-            printf("%i | ", getMatrixAt(&res, rows, colms));
-        }
-        printf("\n");
-    }
-    printf("\n");
-    int esult = mulMatrix(&res, &mat1, &mat2);
-    for (int rows = 0; rows < res.rows; rows++)
-    {
-        for (int colms = 0; colms < res.colms; colms ++)
-        {
-            printf("%i | ", getMatrixAt(&res, rows, colms));
-        }
-        printf("\n");
-    }
-
-    freeMatrix(&mat1);
-    freeMatrix(&mat2);
-    freeMatrix(&res);
-
-    int s[] = {2,2,300}; 
-
-    return 0;
-}
-*/

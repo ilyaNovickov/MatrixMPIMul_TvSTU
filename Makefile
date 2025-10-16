@@ -5,7 +5,7 @@ BIN_DIR = bin
 SRC = $(wildcard $(SRC_DIR)/*.c)
 OBJ = $(SRC:$(SRC_DIR)/%.c=$(BIN_DIR)/%.o)
 DEPS = $(OBJ:.o=.d)
-LIBS = -lgmp
+LIBS = -lgmp -lm
 
 # ==== Сборка RELEASE ====
 CFLAGS = -Wall -O2 -std=c11
