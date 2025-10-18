@@ -40,7 +40,8 @@ run: $(TARGET)
 	mpirun -np 4 ./$(TARGET)
 
 run_debug: $(DEBUG_TARGET)
-	./$(DEBUG_TARGET)
+	mpirun -np 4 ./$(DEBUG_TARGET)
+#	./$(DEBUG_TARGET)
 
 clean:
 	rm -rf $(BIN_DIR)

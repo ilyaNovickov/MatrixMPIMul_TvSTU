@@ -1,3 +1,23 @@
+/*
+//Test
+#include <mpi.h>
+#include <stdio.h>
+
+
+int main(int argc, char** argv)
+{
+    MPI_Init(&argc, &argv);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    printf("Hello from rank %d of %d\n", rank, size);
+    MPI_Finalize();
+}
+    */
+
+//Размер перемножаемых матриц (константа, изменить и перекомпилировать, иначе беда)
+#define MATRIXSIZE 6
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -39,13 +59,9 @@ void InitSqMatrixes(MatrixF* a, MatrixF* b, int matrixSize)
         a->data[i] = i + 1;
         b->data[i] = i + 1;
     }
-    printf("=== Matrix A ===\n");
-    printMatrixF(a);
-    printf("================\n");
-    printf("=== Matrix B ===\n");
-    printMatrixF(b);
-    printf("================\n");
 }
+
+
 
 int main(int argc, char** argv)
 {
@@ -59,11 +75,19 @@ int main(int argc, char** argv)
 
     double start = MPI_Wtime();//timer 1
 
-    //step 1: init CPU matrix P
+    #pragma region BigInitRegion
+    /*
+    Шаг №0 - Иницилизация данных
+    Пусть q - размер матрицы процессов
+    block_size - размер блока в каждом CPU
+    size - кол-во процессов (определяется через MPI)
+    */
+    #pragma region InitData
 
-    //size of CPU matrix (q x q)
+    //Размер матрицы процессоров (q x q)
     int q = (int)sqrt(size);
-    //checking q
+
+    //Проверка q
     if (q * q != size)
     {
         if (rank == 0)
@@ -72,55 +96,74 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    //create topology for CPU matrix
-    int dims[2] = {q, q};//CPU matrix
-    int periods[2] = {1, 1}; //borders for B moving
-    //switcher where P matrix will be
+    //Создание матрицы для топологии CPU
+    int dims[2] = {q, q};//CPU матрица
+    int periods[2] = {1, 1}; //Границы для перемещения блоков матриц B
+    //Коммутатор для работы с топологией
     MPI_Comm cart_comm;
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &cart_comm);
+    
+    int N = MATRIXSIZE;//size of matrix (N x N)
 
-    /*
-    //find coords for CPU (rank) in P (CPU matrix)
-    int coords[2];
-    MPI_Cart_coords(cart_comm, rank, 2, coords);
-    int row = coords[0];
-    int col = coords[1];
-    */
+    //Размер блоков в каждом CPU
+    int block_size = N / q;
+    //int block_size = 3;
 
-    //generate matrix A and B
-    MatrixF A, B;
-    int N = 6;//size of matrix (N x N)
-
+    #pragma region Values
     if (rank == 0)
     {
-        InitSqMatrixes(&A, &B, N);
+        printf("VALUES :\n");
+        printf("SIZE == %i\n", size);
+        printf("N == %i \\\\Square matrix size\n", size);
+        printf("q == %i \\\\Size of CPU matrix\n", size);
+        printf("-n == %i \\\\Block size\n\n\n", size);
     }
+    #pragma endregion Values
 
-    //size of one block in each CPU
-    int block_size = N / q;
+    #pragma endregion InitData
 
+    /*
+    Шаг №0 (всё-ещё) - Отправка блоков по матрицам (первичная)
+
+    CPU №0 делит матрицы A, B и C на блоки
+    и рассылает на нужные процессоры
+    */
+    #pragma region InitBlocks
     MatrixF localA = createMatrixF(block_size, block_size);
     MatrixF localB = createMatrixF(block_size, block_size);
     MatrixF localC = createMatrixF(block_size, block_size);
     
-    if (rank == 0)
+    if (rank == 0)//CPU №0 формирует блоки
     {
+        #pragma region SendingBlocks
+        MatrixF A, B;
+        //Иницилизация матриц размером N
+        InitSqMatrixes(&A, &B, N);
+
+        printf("=== Matrix A ===\n");
+        printMatrixF(&A);
+        printf("================\n");
+        printf("=== Matrix B ===\n");
+        printMatrixF(&B);
+        printf("================\n");
+    
+        //Формирования блоков для каждого ЦП
         for (int proc = 0; proc < size; proc++)
         {
-            int row;
-            int col;
-            getCPUCoords(&row, &col, &cart_comm, proc);
+            int rowProc;
+            int colProc;
+            getCPUCoords(&rowProc, &colProc, &cart_comm, proc);
 
-            //take block
             MatrixF tempA = createMatrixF(block_size, block_size);
             MatrixF tempB = createMatrixF(block_size, block_size);
-        
+            
+            //Вычленение блоков из матриц A и B  
             for (int i = 0; i < block_size; i++)
             {
                 for (int j = 0; j < block_size; j++)
                 {
-                    float valA = getMatrixFAt(&A, row*block_size+i, col*block_size+j);
-                    float valB = getMatrixFAt(&B, row*block_size+i, col*block_size+j);
+                    float valA = getMatrixFAt(&A, rowProc*block_size+i, colProc*block_size+j);
+                    float valB = getMatrixFAt(&B, rowProc*block_size+i, colProc*block_size+j);
 
                     setMatrixFAt(&tempA, i, j, valA);
                     setMatrixFAt(&tempB, i, j, valB);
@@ -129,69 +172,111 @@ int main(int argc, char** argv)
 
             if (proc == 0)
             {
+                //Мы уже на CPU №0
                 localA = tempA;
                 localB = tempB;
+
+                printf(">>> CPU with rank = %i get next blocks A and B :\n", rank);
+                printf("+++ Block A +++\n");
+                printMatrixF(&localA);
+                printf("+++++++++++++++\n");
+                printf("+++ Block B +++\n");
+                printMatrixF(&localA);
+                printf("+++++++++++++++\n");
             }
             else
             {
+                //Отправка блоков 
                 MPI_Send(tempA.data, block_size * block_size, MPI_FLOAT, proc, 0, cart_comm);
                 MPI_Send(tempB.data, block_size * block_size, MPI_FLOAT, proc, 1, cart_comm);
                 freeMatrixF(&tempA);
                 freeMatrixF(&tempB);
             }
         }
+
+        freeMatrixF(&A);
+        freeMatrixF(&B);
+        #pragma endregion SendingBlocks
     }
     else
     {
+        //Если это не CPU №0 (главный), то CPU получает блоки матриц A и B
         MPI_Recv(localA.data, block_size*block_size, MPI_FLOAT, 0, 0, cart_comm, MPI_STATUS_IGNORE);
         MPI_Recv(localB.data, block_size * block_size, MPI_FLOAT, 0, 1, cart_comm, MPI_STATUS_IGNORE);
-    }
 
+        int rank;
+        MPI_Comm_rank(cart_comm, &rank);
+        printf(">>> CPU with rank = %i get next blocks A and B :\n", rank);
+        printf("+++ Block A +++\n");
+        printMatrixF(&localA);
+        printf("+++++++++++++++\n");
+        printf("+++ Block B +++\n");
+        printMatrixF(&localA);
+        printf("+++++++++++++++\n");
+    }
+    #pragma endregion InitBlocks
+
+    #pragma endregion BigInitRegion
+
+    //Оснвоной алгоритм Фокса
+    #pragma region FoxAlgorithm
+
+    //Получение координат текущего CPU
     int row;
     int col;
-    getCPUCoords(&row, &col, &cart_comm, 0);
+    MPI_Comm_rank(cart_comm, &rank);
+    getCPUCoords(&row, &col, &cart_comm, rank);
 
-    //Fox's do
+    //Промежуточный блок A для отправки по строкам
     MatrixF tempA = createMatrixF(block_size, block_size);
 
+    //Выполняется q-1 раз
     for (int stage = 0; stage < q; stage++)
     {
-        int root = (row + stage) % q;//which A matrix send
-
+        int root = (row + stage) % q;//Определяет CPU, который отправляет блок A
+        
+        //Копирование блока A для отправки
         if (col == root)
         {
             for (int i = 0; i < block_size * block_size; i++)
             {
                 tempA.data[i] = localA.data[i];
-
             }
         }
-        //send A for row
+        //Отправка блока A по строкам
         MPI_Bcast(tempA.data, block_size*block_size, MPI_FLOAT, root, cart_comm);
 
+        //Перемножение блоков A и B и накопление их суммы в блоке C
         mulAndAddMatrixF(&localC, &tempA, &localB);
 
-        //shift for colums of B matrix
-        int src, dst;
-        MPI_Cart_shift(cart_comm, 0, -1, &src, &dst);
+        //Перемещение блоков B вверх по стоблам (циклически)
+        int src, dst;// CPU, от которых мы получим новые данные и куда мы отправим свои данные
+        MPI_Cart_shift(cart_comm, 0, -1, &src, &dst);//Ищет соседний CPU в топлогии по колонне (-1)
+        //Одновременно отправляет данные в dst и получает новые данные от src
         MPI_Sendrecv_replace(localB.data, block_size*block_size, MPI_FLOAT, dst, 0, src, 0, cart_comm, MPI_STATUS_IGNORE);
     }
 
     freeMatrixF(&tempA);
+    #pragma endregion FoxAlgorithm
 
-    //get result to rank == 0 CPU
+    //Получение результатов на CPU №0
+    #pragma region GetResult
+
     MatrixF C;
 
+    //Сборка результата только на CPU №0
     if (rank == 0)
     {
         C = createMatrixF(N, N);
 
+        //Проход по каждома ЦП
         for (int proc = 0; proc < size; proc++)
         {
             int row;
             int col;
             getCPUCoords(&row, &col, &cart_comm, proc);
 
+            //ЦП №0 уже знает свои блок. Уже нужно просто скопировать
             if (proc == 0)
             {
                 for (int i = 0; i < block_size; i++)
@@ -205,6 +290,8 @@ int main(int argc, char** argv)
             }
             else
             {
+                //Для других ЦП: нужно получить блок C
+                //и скопировать его в матрицу результата с учётом смещения
                 MatrixF tempC = createMatrixF(block_size, block_size);
 
                 MPI_Recv(tempC.data, block_size*block_size, MPI_FLOAT, proc, 2, cart_comm, MPI_STATUS_IGNORE);
@@ -214,7 +301,7 @@ int main(int argc, char** argv)
                     for (int j = 0; j < block_size; j++)
                     {
                         float val = getMatrixFAt(&tempC, i, j);
-                    setMatrixFAt(&C, row*block_size + i, col*block_size + j, val);
+                        setMatrixFAt(&C, row*block_size + i, col*block_size + j, val);
                     }
                 }
 
@@ -222,10 +309,20 @@ int main(int argc, char** argv)
             }
         }
     }
+    //Другие CPU только отправляют свои блоки C на ЦП №0
     else
     {
         MPI_Send(localC.data, block_size*block_size, MPI_FLOAT, 0, 2, cart_comm);
+
+        int rank;
+        MPI_Comm_rank(cart_comm, &rank);
+        printf(">>> CPU with rank = %i get next blocks C :\n", rank);
+        printf("### Block C ###\n");
+        printMatrixF(&localC);
+        printf("###############\n");
     }
+
+    #pragma endregion GetResult
 
 
     //end
@@ -237,17 +334,19 @@ int main(int argc, char** argv)
     }
 
     //trash bin
-    printf("=========\n");
+    #pragma region FreesAndEnd
+    printf("=== Matrix C ===\n");
     printMatrixF(&C);
-    
+    printf("================\n");
+
     MPI_Finalize();
-    freeMatrixF(&A);
-    freeMatrixF(&B);
+    
     freeMatrixF(&C);
+
     freeMatrixF(&localA);
     freeMatrixF(&localB);
     freeMatrixF(&localC);
-    freeMatrixF(&tempA);
 
     return 0;
+    #pragma endregion
 }
