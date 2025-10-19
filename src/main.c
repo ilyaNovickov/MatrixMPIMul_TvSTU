@@ -15,6 +15,11 @@
 
 #include "matrix_utils_f.h"
 
+/// @brief Определить координаты CPU в топологии
+/// @param resRow Выходная строка
+/// @param resCol Выходной столбец
+/// @param cart_comm Топология
+/// @param rank Ранг процессора (т. е. сам CPU)
 void getCPUCoords(int* resRow, int* resCol, MPI_Comm* cart_comm, int rank)
 {
     int coords[2];
@@ -23,6 +28,8 @@ void getCPUCoords(int* resRow, int* resCol, MPI_Comm* cart_comm, int rank)
     *resCol = coords[1];
 }
 
+/// @brief Вывод матрицы
+/// @param matrix Выодимая матрицы
 void printMatrixF(MatrixF* matrix)
 {
     for (int row = 0; row < matrix->rows; row++)
@@ -33,20 +40,27 @@ void printMatrixF(MatrixF* matrix)
         }
         printf("\n");
     }
-    printf("\n");
+    //printf("\n");
 }
 
+/// @brief Иницилизация матриц дял алгоритма фокса
+/// @param a Матрицы A
+/// @param b Матрицы B
+/// @param matrixSize Размер квадратных матриц
 void InitSqMatrixes(MatrixF* a, MatrixF* b, int matrixSize)
 {
     *a = createMatrixF(matrixSize, matrixSize);
     *b = createMatrixF(matrixSize, matrixSize);
-    //fillMatrixFRandom(&A);
-    //fillMatrixFRandom(&B);
+
+    fillMatrixFRandom(&a);
+    fillMatrixFRandom(&b);
+    /*
     for (int i = 0; i < matrixSize*matrixSize; i++)
     {
         a->data[i] = i + 1;
         b->data[i] = i + 1;
     }
+        */
 }
 
 

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+//Макрос для определения адреса указанного элемента массива
 #define INDEXF(mat, row, col) ((row) * (mat)->colms + (col))
 
 MatrixF createMatrixF(int rows, int colms) {
