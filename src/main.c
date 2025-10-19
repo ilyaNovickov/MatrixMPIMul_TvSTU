@@ -114,9 +114,9 @@ int main(int argc, char** argv)
     {
         printf("VALUES :\n");
         printf("SIZE == %i\n", size);
-        printf("N == %i \\\\Square matrix size\n", size);
-        printf("q == %i \\\\Size of CPU matrix\n", size);
-        printf("-n == %i \\\\Block size\n\n\n", size);
+        printf("N == %i \\\\Square matrix size\n", N);
+        printf("q == %i \\\\Size of CPU matrix\n", q);
+        printf("-n == %i \\\\Block size\n\n\n", block_size);
     }
     #pragma endregion Values
 
@@ -154,6 +154,8 @@ int main(int argc, char** argv)
             int colProc;
             getCPUCoords(&rowProc, &colProc, &cart_comm, proc);
 
+            printf("CURRENT CPU ROW == %i and COL == %i\n", rowProc, colProc);
+
             MatrixF tempA = createMatrixF(block_size, block_size);
             MatrixF tempB = createMatrixF(block_size, block_size);
             
@@ -176,19 +178,20 @@ int main(int argc, char** argv)
                 localA = tempA;
                 localB = tempB;
 
-                printf(">>> CPU with rank = %i get next blocks A and B :\n", rank);
-                printf("+++ Block A +++\n");
+                printf("SENDING BLOCKS\n");
+                printf("DESTANATION RANK == %i\n", proc);
                 printMatrixF(&localA);
-                printf("+++++++++++++++\n");
-                printf("+++ Block B +++\n");
-                printMatrixF(&localA);
-                printf("+++++++++++++++\n");
             }
             else
             {
                 //Отправка блоков 
                 MPI_Send(tempA.data, block_size * block_size, MPI_FLOAT, proc, 0, cart_comm);
                 MPI_Send(tempB.data, block_size * block_size, MPI_FLOAT, proc, 1, cart_comm);
+
+                printf("SENDING BLOCKS\n");
+                printf("DESTANATION RANK == %i\n", proc);
+                printMatrixF(&tempA);
+
                 freeMatrixF(&tempA);
                 freeMatrixF(&tempB);
             }
@@ -205,14 +208,10 @@ int main(int argc, char** argv)
         MPI_Recv(localB.data, block_size * block_size, MPI_FLOAT, 0, 1, cart_comm, MPI_STATUS_IGNORE);
 
         int rank;
-        MPI_Comm_rank(cart_comm, &rank);
-        printf(">>> CPU with rank = %i get next blocks A and B :\n", rank);
-        printf("+++ Block A +++\n");
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        printf("RECIEVE BLOCKS\n");
+        printf("RANK == %i\n", rank);
         printMatrixF(&localA);
-        printf("+++++++++++++++\n");
-        printf("+++ Block B +++\n");
-        printMatrixF(&localA);
-        printf("+++++++++++++++\n");
     }
     #pragma endregion InitBlocks
 
@@ -313,13 +312,6 @@ int main(int argc, char** argv)
     else
     {
         MPI_Send(localC.data, block_size*block_size, MPI_FLOAT, 0, 2, cart_comm);
-
-        int rank;
-        MPI_Comm_rank(cart_comm, &rank);
-        printf(">>> CPU with rank = %i get next blocks C :\n", rank);
-        printf("### Block C ###\n");
-        printMatrixF(&localC);
-        printf("###############\n");
     }
 
     #pragma endregion GetResult
@@ -335,13 +327,15 @@ int main(int argc, char** argv)
 
     //trash bin
     #pragma region FreesAndEnd
-    printf("=== Matrix C ===\n");
-    printMatrixF(&C);
-    printf("================\n");
+    if (rank == 0)
+    {
+        printf("=== Matrix C ===\n");
+        printMatrixF(&C);
+        printf("================\n");
+        freeMatrixF(&C);
+    }
 
     MPI_Finalize();
-    
-    freeMatrixF(&C);
 
     freeMatrixF(&localA);
     freeMatrixF(&localB);
