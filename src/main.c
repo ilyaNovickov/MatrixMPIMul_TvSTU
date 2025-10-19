@@ -1,22 +1,10 @@
-/*
-//Test
-#include <mpi.h>
-#include <stdio.h>
-
-
-int main(int argc, char** argv)
-{
-    MPI_Init(&argc, &argv);
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    printf("Hello from rank %d of %d\n", rank, size);
-    MPI_Finalize();
-}
-    */
-
 //Размер перемножаемых матриц (константа, изменить и перекомпилировать, иначе беда)
-#define MATRIXSIZE 6
+//РАЗМЕР МАТРИЦЫ И КОЛ-ВО CPU
+//4x4 --- 2 --- ?
+//6x6 --- 4 --- OK
+//9x9 --- 9 --- OK
+//10.000x10.000 --- 1000 --- mb, too slow
+#define MATRIXSIZE 10000
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,7 +61,11 @@ int main(int argc, char** argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    double start = MPI_Wtime();//timer 1
+    double start;
+    if (rank == 0)
+    {
+        start = MPI_Wtime();
+    }
 
     #pragma region BigInitRegion
     /*
@@ -102,6 +94,11 @@ int main(int argc, char** argv)
     //Коммутатор для работы с топологией
     MPI_Comm cart_comm;
     MPI_Cart_create(MPI_COMM_WORLD, 2, dims, periods, 1, &cart_comm);
+
+    //Создание подкоммуникаторов для работы со строками
+    MPI_Comm row_comm;
+    int remain_dims[2] = {0, 1}; //Работа только со строками
+    MPI_Cart_sub(cart_comm, remain_dims, &row_comm);
     
     int N = MATRIXSIZE;//size of matrix (N x N)
 
@@ -234,6 +231,7 @@ int main(int argc, char** argv)
     {
         int root = (row + stage) % q;//Определяет CPU, который отправляет блок A
         
+        //Если мы в главном столбце на этом шаге, то
         //Копирование блока A для отправки
         if (col == root)
         {
@@ -243,7 +241,7 @@ int main(int argc, char** argv)
             }
         }
         //Отправка блока A по строкам
-        MPI_Bcast(tempA.data, block_size*block_size, MPI_FLOAT, root, cart_comm);
+        MPI_Bcast(tempA.data, block_size*block_size, MPI_FLOAT, root, row_comm);
 
         //Перемножение блоков A и B и накопление их суммы в блоке C
         mulAndAddMatrixF(&localC, &tempA, &localB);
@@ -317,14 +315,6 @@ int main(int argc, char** argv)
     #pragma endregion GetResult
 
 
-    //end
-    double end = MPI_Wtime();//timer 2
-
-    if (rank == 0)
-    {
-        printf("Time %f seconds for rank = %i\n", end - start, rank);
-    }
-
     //trash bin
     #pragma region FreesAndEnd
     if (rank == 0)
@@ -333,6 +323,10 @@ int main(int argc, char** argv)
         printMatrixF(&C);
         printf("================\n");
         freeMatrixF(&C);
+
+        double end = MPI_Wtime();
+        printf("Time %f seconds (mb) for rank = %i\n", end - start, rank);
+    
     }
 
     MPI_Finalize();
