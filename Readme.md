@@ -15,6 +15,7 @@ sudo apt install libgmp-dev
 
 Комприляция:
 cd <папка с Makefile'ом>
+mkdir bin (если нет этой папки, иначе некуда компилировать файлы)
 make debug или make
 
 Запуск:
