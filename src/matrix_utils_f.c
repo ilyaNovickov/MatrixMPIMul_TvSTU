@@ -1,5 +1,6 @@
 #include "matrix_utils_f.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <time.h>
 
 //Макрос для определения адреса указанного элемента массива
@@ -97,4 +98,27 @@ void fillMatrixFRandom(MatrixF* matrix) {
             setMatrixFAt(matrix, i, j, value);
         }
     }
+}
+
+int writeMatrixFinFile(char* path, MatrixF* matrix)
+{
+    FILE* file = fopen(path, "w+");
+
+    if (file == NULL)
+    {
+        return 1;
+    }
+
+    for (int row = 0; row < matrix->rows; row++)
+    {
+        for (int col = 0; col < matrix->colms; col++)
+        {
+            fprintf(file, "%f;", getMatrixFAt(matrix, row, col));
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+
+    return 0;
 }

@@ -11,6 +11,13 @@
 //Используется для дебага при малых матрицах (MATRIXSIZE)
 #define CONSOLE 0
 
+//Определяет, записываются ли матрицы в CSV файл,
+//чтобы можно проанализировать данные
+#define WRITECSV 0
+
+//Определяет заполняет ли матрицы слючайными значениями (0)
+//или порядковым номером элемента (1)
+#define FILLMATRIXWITHVALS 0
 
 
 #include <stdio.h>
@@ -59,15 +66,16 @@ void InitSqMatrixes(MatrixF* a, MatrixF* b, int matrixSize)
     *a = createMatrixF(matrixSize, matrixSize);
     *b = createMatrixF(matrixSize, matrixSize);
 
-    fillMatrixFRandom(&a);
-    fillMatrixFRandom(&b);
-    /*
+    #if FILLMATRIXWITHVALS == 0
+    fillMatrixFRandom(a);
+    fillMatrixFRandom(b);
+    #else
     for (int i = 0; i < matrixSize*matrixSize; i++)
     {
         a->data[i] = i + 1;
         b->data[i] = i + 1;
     }
-        */
+    #endif
 }
 
 
@@ -166,6 +174,11 @@ int main(int argc, char** argv)
         printMatrixF(&B);
         printf("================\n");
         #endif
+
+        #if WRITECSV == 1
+        writeMatrixFinFile("A.csv", &A);
+        writeMatrixFinFile("B.csv", &B);
+        #endif
     
         //Формирования блоков для каждого ЦП
         for (int proc = 0; proc < size; proc++)
@@ -174,7 +187,7 @@ int main(int argc, char** argv)
             int colProc;
             getCPUCoords(&rowProc, &colProc, &cart_comm, proc);
 
-            printf("CURRENT CPU ROW == %i and COL == %i\n", rowProc, colProc);
+            //printf("CURRENT CPU ROW == %i and COL == %i\n", rowProc, colProc);
 
             MatrixF tempA = createMatrixF(block_size, block_size);
             MatrixF tempB = createMatrixF(block_size, block_size);
@@ -198,9 +211,9 @@ int main(int argc, char** argv)
                 localA = tempA;
                 localB = tempB;
 
-                printf("SENDING BLOCKS\n");
-                printf("DESTANATION RANK == %i\n", proc);
-                printMatrixF(&localA);
+                //printf("SENDING BLOCKS\n");
+                //printf("DESTANATION RANK == %i\n", proc);
+                //printMatrixF(&localA);
             }
             else
             {
@@ -208,9 +221,9 @@ int main(int argc, char** argv)
                 MPI_Send(tempA.data, block_size * block_size, MPI_FLOAT, proc, 0, cart_comm);
                 MPI_Send(tempB.data, block_size * block_size, MPI_FLOAT, proc, 1, cart_comm);
 
-                printf("SENDING BLOCKS\n");
-                printf("DESTANATION RANK == %i\n", proc);
-                printMatrixF(&tempA);
+                //printf("SENDING BLOCKS\n");
+                //printf("DESTANATION RANK == %i\n", proc);
+                //printMatrixF(&tempA);
 
                 freeMatrixF(&tempA);
                 freeMatrixF(&tempB);
@@ -227,11 +240,11 @@ int main(int argc, char** argv)
         MPI_Recv(localA.data, block_size*block_size, MPI_FLOAT, 0, 0, cart_comm, MPI_STATUS_IGNORE);
         MPI_Recv(localB.data, block_size * block_size, MPI_FLOAT, 0, 1, cart_comm, MPI_STATUS_IGNORE);
 
-        int rank;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        printf("RECIEVE BLOCKS\n");
-        printf("RANK == %i\n", rank);
-        printMatrixF(&localA);
+        //int rank;
+        //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        //printf("RECIEVE BLOCKS\n");
+        //printf("RANK == %i\n", rank);
+        //printMatrixF(&localA);
     }
     #pragma endregion InitBlocks
 
@@ -346,6 +359,10 @@ int main(int argc, char** argv)
         printf("=== Matrix C ===\n");
         printMatrixF(&C);
         printf("================\n");
+        #endif
+
+        #if WRITECSV == 1
+        writeMatrixFinFile("C.csv", &C);
         #endif
 
         freeMatrixF(&C);
