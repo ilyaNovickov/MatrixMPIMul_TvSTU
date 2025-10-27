@@ -1,0 +1,23 @@
+{
+  "configurations": [
+    {
+      "name": "linux-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/usr/include",
+        "/usr/lib/gcc/x86_64-linux-gnu/**",
+        "/usr/include/x86_64-linux-gnu",
+        "/usr/lib/x86_64-linux-gnu/mpich/include",
+        "/usr/lib/x86_64-linux-gnu/mpich/lib"
+      ],
+      "compilerPath": "/usr/bin/mpicc",
+      "cStandard": "${default}",
+      "cppStandard": "${default}",
+      "intelliSenseMode": "linux-gcc-x64",
+      "compilerArgs": [
+        ""
+      ]
+    }
+  ],
+  "version": 4
+}
