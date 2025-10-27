@@ -6,6 +6,13 @@
 //10.000x10.000 --- 1000 --- mb, too slow
 #define MATRIXSIZE 10000
 
+//Определяет, выводить ли в консоль
+//матрицы A, B, C
+//Используется для дебага при малых матрицах (MATRIXSIZE)
+#define CONSOLE 0
+
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -151,12 +158,14 @@ int main(int argc, char** argv)
         //Иницилизация матриц размером N
         InitSqMatrixes(&A, &B, N);
 
+        #if CONSOLE == 1
         printf("=== Matrix A ===\n");
         printMatrixF(&A);
         printf("================\n");
         printf("=== Matrix B ===\n");
         printMatrixF(&B);
         printf("================\n");
+        #endif
     
         //Формирования блоков для каждого ЦП
         for (int proc = 0; proc < size; proc++)
@@ -333,9 +342,12 @@ int main(int argc, char** argv)
     #pragma region FreesAndEnd
     if (rank == 0)
     {
+        #if CONSOLE == 1
         printf("=== Matrix C ===\n");
         printMatrixF(&C);
         printf("================\n");
+        #endif
+
         freeMatrixF(&C);
 
         double end = MPI_Wtime();
