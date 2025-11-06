@@ -4,7 +4,7 @@
 //6x6 --- 4 --- OK
 //9x9 --- 9 --- OK
 //10.000x10.000 --- 1000 --- mb, too slow
-#define MATRIXSIZE 10000
+#define MATRIXSIZE 12
 
 //Определяет, выводить ли в консоль
 //матрицы A, B, C
@@ -133,7 +133,14 @@ int main(int argc, char** argv)
 
     //Размер блоков в каждом CPU
     int block_size = N / q;
-    //int block_size = 3;
+    
+    if (N % q != 0)
+    {
+        if (rank == 0)
+            printf("Block size isnot int : N / q == %f\n", (float)N / (float)q);
+        MPI_Finalize();
+        return -1;
+    }
 
     #pragma region Values
     if (rank == 0)
