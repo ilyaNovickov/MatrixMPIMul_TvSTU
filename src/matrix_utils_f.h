@@ -78,7 +78,6 @@ int mulAndAddMatrixF(MatrixF* c, MatrixF* a, MatrixF* b);
 /// @param matrix Матрица на заплнение
 void fillMatrixFRandom(MatrixF* matrix); // float [-1.0, +1.0]
 
-
 int writeMatrixFinFile(char* path, MatrixF* matrix);
 
 #endif

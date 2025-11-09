@@ -1,10 +1,19 @@
+//Приложение запускать через "mpirun -np P <имя программы>"
+//где p - кол-во процессоров
+//Если приложение запускается на одном компьютере с многоядерным
+//процессором, то P желательно выставлять равным или меньшим, чем
+//кол-во ядер в машине
+//Если P больше, чем число ядер у CPU, то вохмножно
+//УХУТШЕНИЕ производительности, так как вознкиает конкуренция
+//между процессами (rank) за ресурсы CPU (а также накладные для передачи сообщений и т. д.)
+
 //Размер перемножаемых матриц (константа, изменить и перекомпилировать, иначе беда)
 //РАЗМЕР МАТРИЦЫ И КОЛ-ВО CPU
 //4x4 --- 2 --- ?
 //6x6 --- 4 --- OK
 //9x9 --- 9 --- OK
 //10.000x10.000 --- 1000 --- mb, too slow
-#define MATRIXSIZE 12
+#define MATRIXSIZE 6
 
 //Определяет, выводить ли в консоль
 //матрицы A, B, C
@@ -13,7 +22,7 @@
 
 //Определяет, записываются ли матрицы в CSV файл,
 //чтобы можно проанализировать данные
-#define WRITECSV 0
+#define WRITECSV 1
 
 //Определяет заполняет ли матрицы слючайными значениями (0)
 //или порядковым номером элемента (1)
@@ -23,7 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-//#include <time.h>
+#include <time.h>
 
 #include <mpi.h>
 
@@ -67,6 +76,8 @@ void InitSqMatrixes(MatrixF* a, MatrixF* b, int matrixSize)
     *b = createMatrixF(matrixSize, matrixSize);
 
     #if FILLMATRIXWITHVALS == 0
+    srand((unsigned) time(NULL)); // Инициализация random seed
+
     fillMatrixFRandom(a);
     fillMatrixFRandom(b);
     #else
@@ -112,7 +123,7 @@ int main(int argc, char** argv)
     if (q * q != size)
     {
         if (rank == 0)
-            printf("Count of CPUs have to be q^2");
+            printf("Count of CPUs have to be q^2\n");
         MPI_Finalize();
         return -1;
     }
@@ -146,7 +157,7 @@ int main(int argc, char** argv)
     if (rank == 0)
     {
         printf("VALUES :\n");
-        printf("SIZE == %i\n", size);
+        printf("SIZE == %i\\\\Process count\n", size);
         printf("N == %i \\\\Square matrix size\n", N);
         printf("q == %i \\\\Size of CPU matrix\n", q);
         printf("-n == %i \\\\Block size\n\n\n", block_size);
@@ -214,6 +225,9 @@ int main(int argc, char** argv)
 
             if (proc == 0)
             {
+                freeMatrixF(&localA);
+                freeMatrixF(&localB);
+                
                 //Мы уже на CPU №0
                 localA = tempA;
                 localB = tempB;
