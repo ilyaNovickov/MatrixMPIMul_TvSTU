@@ -25,6 +25,7 @@ make debug или make
 
 Либо по сторинки:
 `mpirun -np <кол-во CPU> <путь к файлу>`
+
 Либо через Makefile (требует изменения в Makefile для установки нового кол-во CPU):
 `make run или make run_debug`
 
